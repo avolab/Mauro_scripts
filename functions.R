@@ -1,35 +1,46 @@
 #Functions needed for reading, filtering and normalizing Cel-SEQ data
 
-#remove or keep only spike ins from given data frame
+#remove spike-ins from given data frame
 rmspike<-function(x){
   ERCCs<-grep("ERCC-",row.names(x)) # gives vector with row # of spike ins
   data<-x[-ERCCs,] # make new data frame without the specified rows
   return(data) # output new data frame
 }
 
+#keep spike-ins from given data frame
 keepspike<-function(x){
-  ERCCs<-grep("ERCC-",row.names(x)) # gives vector with row # of spike ins
+  ERCCs<-grep("ERCC-",row.names(x)) 
   data<-x[ERCCs,] # make new data frame with only the specified rows
-  return(data) # output new data frame
+  return(data)
 }
 
-# plot oversequencing for combination of datasets, # x = rc file, y = bc file, name = name of data frame
-# if pdf= TRUE, will save files in subdirectory "plots" of the current working directory,otherwise plot
+# plot oversequencing for combination of datasets,
+# x = read count file, y = barcode count file, name = name of data frame
+# if pdf= TRUE, will save files in subdirectory "plots" of the current working directory,otherwise will plot to screen
 overseq <- function(x,y,name,pdf=FALSE){
   main=paste("oversequencing",name)   # mixes string + name of choice
   xlab=bquote(log[2] ~ "read counts / barcode counts")    # mixes subscript + string
-  if(pdf){
-    pdf(paste(getwd(),"/plots/",main,".pdf",sep=""))
+    if(pdf){ # if pdf=TRUE, make pdf
+        pdf(paste(getwd(),"/plots/",main,".pdf",sep="")) # make in subdir "/plots" of current working dir, using main for filename
     hist(log2(apply(x,1,sum)/apply(y,1,sum)),breaks=75, col="lightblue", main=main,xlab=xlab)
     dev.off()
   }
-  else{hist(log2(apply(x,1,sum)/apply(y,1,sum)),breaks=75, col="lightblue", main=main,xlab=xlab)}
+    else{hist(log2(apply(x,1,sum)/apply(y,1,sum)),breaks=75, col="lightblue", main=main,xlab=xlab)}
 }
 
-#construct a data object with all data frames in it, feed it two lists: 
-# one with names (of experiments) and one with data frames, these
-# will be rearragned to form a 2-dimensional list, where each element contains 1 experiment,
+# make GENEID the rownames and remove column GENEID
+nogeneid<-function(x){
+    data <- as.data.frame(x)
+    rownames(data) = data[,1]
+    data= data[,-1]
+    return(data)
+}
+
+# construct a data object with all data frames in it, feed it two lists: 
+# one with names (of experiments/timepoints etc) and one with data frames
+# these will be rearragned to form a 2-dimensional list, where each element contains 1 experiment,
 # row 1 = name of the experiment (will be used to lable plots), row 2 = corresponding data frame
+# subsequent rows will be used to add normalized/filtered/etc data frames to the object
 makeobject<-function(x,y){
   obj <- list()
   if(length(x) != length(y)) stop("lengths of lists do not match")
@@ -48,19 +59,19 @@ combineplots<-function(a,b,square=FALSE){
 }
 
 #plot total number of reads per sample, x = data object, i'th column, j'th row 
-#pdf=TRUE to store plot in pdf in /plots direcotry of current directory
+#pdf=TRUE to store plot in pdf in /plots directory of current directory
 totalreads <- function(x,i,j,pdf=FALSE){
     main=paste("total reads",x[[i]][[1]]) # get name from ith column and first row
   if(pdf){
       pdf(paste(getwd(),"/plots/",main,".pdf",sep=""))
       b<-barplot(colSums(x[[i]][[j]]),xaxt="n",xlab="samples",main=main,col="lightgrey") 
       #no x-axis lables, store barplot values in vector for x-axis tick marks
-     axis(1,at=b,labels=c(1:length(x[[i]][[j]]))) # 1=horizontal at = position of marks
+     axis(1,at=b,labels=c(1:length(x[[i]][[j]]))) # 1=horizontal at=position of tickmarks
     dev.off()
    } 
   else{
     b<-barplot(colSums(x[[i]][[j]]),xaxt="n",xlab="samples",main=main,col="lightgrey") 
-    axis(1,at=b,labels=c(1:length(x[[i]][[j]]))) # 1=horizontal at = position of marks
+    axis(1,at=b,labels=c(1:length(x[[i]][[j]]))) # 1=horizontal at=position of marks
   }
 }
 
@@ -184,13 +195,6 @@ plotgenes<-function(x,i,j,n){
   boxplot(as.vector(k),main=n,xlab="KO")
 }
 
-# make GENEID the rownames and remove column GENEID
-nogeneid<-function(x){
-  data <- as.data.frame(x)
-  rownames(data) = data[,1]
-  data= data[,-1]
-  return(data)
-}
 
 # Merge all dataframes of 1 row from object into one
 mergeall<-function(x,y){
@@ -236,68 +240,4 @@ cor.samples<-function(x,samplist,conditions,i){
   )
 }
 
-# Plot correlation plots of 2 genes in WT and KO situation
-# x = dataframe, gene1 and gene2 = genes of interest (watch for double names)
-# samplist = list of column # of conditions
-# conditions = list of condition names
-# i = ith for loop
-# set control == TRUE to look at control samples
-cor2genes<-function(x,gene1,gene2,samplist,conditions,i,control==FALSE){
-  data<-x[,samplist[[i]]] # create dataset of only one of the conditions
-  if (control=TRUE){
-    wt<-data[,grep("CTR_E",names(data))]
-    ko<-data[,grep("CTR_O",names(data))]
-  }
-  else{wt<-data[,grep("CEL_E",names(data))]
-    ko<-data[,grep("CEL_O",names(data))]
-  }
-  g1.wt<-grep(n1, rownames(wt))
-  g2.wt<-grep(n2, rownames(wt))
-  g1.ko<-grep(n1, rownames(ko))
-  g2.ko<-grep(n2, rownames(ko))
-
-
-c <-as.matrix(rbind(wt[a,],wt[b,]))
-d <-as.matrix(rbind(ko[a.d,],ko[b.d,]))
-
-###include following to only look at non-zero values#
-c.1<-which(c[1,]>0)
-c.2<-which(c[2,]>0)
-d.1<-which(d[1,]>0)
-d.2<-which(d[2,]>0)
-
-c.keep<-c.1 %in% c.2
-c.keep.2<-c.2 %in% c.1
-d.keep<-d.1 %in% d.2
-d.keep.2<-d.2 %in% d.1
-
-c.1<-c.1[c.keep]
-c.2<-c.2[c.keep.2]
-d.1<-d.1[d.keep]
-d.2<-d.2[d.keep.2]
-
-c.1<-as.vector(c[1,])[c.1]
-c.2<-as.vector(c[2,])[c.2]
-d.1<-as.vector(d[1,])[d.1]
-d.2<-as.vector(d[2,])[d.2]
-
-c <-as.matrix(rbind(c.1,c.2))
-d <-as.matrix(rbind(d.1,d.2))
-###finished non-zero part
-
-R2.wt <- cor(as.vector(c[1,]), as.vector(c[2,]))
-R2.dicer <-cor(as.vector(d[1,]),as.vector(d[2,]))
-
-#plot expression values of the 2 genes against each other
-#make sure the two plots endup in the same figure, and that the figures are square (pty=s)
-par(mfrow=c(1,2))
-par(pty="s")
-plot(as.matrix(c[1,]),as.matrix(c[2,]), main="WT",xlab=n1, ylab=n2, pch=19)
-legend("topright", bty="n", legend=paste("R2:",format(R2.wt, digits=3)))
-plot(as.matrix(d[1,]), as.matrix(d[2,]),main="Dicer", xlab=n1, ylab=n2, pch=19)
-legend("topright",bty="n",legend=paste("R2:",format(R2.dicer,digits=3)))
-
-dev.off() # return to normal plotting
-
-} #UNFINISHED
 
